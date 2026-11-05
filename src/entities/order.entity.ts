@@ -1,6 +1,6 @@
 import {
-  Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany,
-  OneToOne, PrimaryGeneratedColumn, UpdateDateColumn,
+  Check, Column, CreateDateColumn, DeleteDateColumn, Entity, Index, JoinColumn,
+  ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn,
 } from 'typeorm';
 import { DecimalTransformer } from '../common/decimal.transformer';
 import { OrderStatus } from '../common/enums';
@@ -23,10 +23,12 @@ export class Order {
   @JoinColumn({ name: 'customer_id' })
   customer: Customer;
 
+  @Index()
   @Column({ name: 'order_number', type: 'varchar', length: 50, unique: true })
   orderNumber: string;
 
-  @Column({ type: 'varchar', length: 30, default: OrderStatus.PENDING })
+  // Panjang diperbesar dari 30 -> 50 agar tidak terpotong jika nilai enum bertambah
+  @Column({ type: 'varchar', length: 50, default: OrderStatus.PENDING })
   status: OrderStatus;
 
   @Column({
@@ -65,4 +67,7 @@ export class Order {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
 }

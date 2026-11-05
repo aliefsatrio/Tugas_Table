@@ -35,8 +35,9 @@ let Order = class Order {
     shipment;
     createdAt;
     updatedAt;
+    deletedAt;
     static _OPENAPI_METADATA_FACTORY() {
-        return { id: { required: true, type: () => String }, customerId: { required: true, type: () => String }, customer: { required: true, type: () => require("./customer.entity").Customer }, orderNumber: { required: true, type: () => String }, status: { required: true, enum: require("../common/enums").OrderStatus }, totalAmount: { required: true, type: () => Number }, shippingRecipientName: { required: true, type: () => String }, shippingPhone: { required: true, type: () => String }, shippingAddress: { required: true, type: () => String }, shippingCity: { required: true, type: () => String }, shippingPostalCode: { required: true, type: () => String }, items: { required: true, type: () => [require("./order-item.entity").OrderItem] }, payment: { required: true, type: () => require("./payment.entity").Payment }, shipment: { required: true, type: () => require("./shipment.entity").Shipment }, createdAt: { required: true, type: () => Date }, updatedAt: { required: true, type: () => Date } };
+        return { id: { required: true, type: () => String }, customerId: { required: true, type: () => String }, customer: { required: true, type: () => require("./customer.entity").Customer }, orderNumber: { required: true, type: () => String }, status: { required: true, enum: require("../common/enums").OrderStatus }, totalAmount: { required: true, type: () => Number }, shippingRecipientName: { required: true, type: () => String }, shippingPhone: { required: true, type: () => String }, shippingAddress: { required: true, type: () => String }, shippingCity: { required: true, type: () => String }, shippingPostalCode: { required: true, type: () => String }, items: { required: true, type: () => [require("./order-item.entity").OrderItem] }, payment: { required: true, type: () => require("./payment.entity").Payment }, shipment: { required: true, type: () => require("./shipment.entity").Shipment }, createdAt: { required: true, type: () => Date }, updatedAt: { required: true, type: () => Date }, deletedAt: { required: true, type: () => Date, nullable: true } };
     }
 };
 exports.Order = Order;
@@ -55,11 +56,12 @@ __decorate([
     __metadata("design:type", customer_entity_1.Customer)
 ], Order.prototype, "customer", void 0);
 __decorate([
+    (0, typeorm_1.Index)(),
     (0, typeorm_1.Column)({ name: 'order_number', type: 'varchar', length: 50, unique: true }),
     __metadata("design:type", String)
 ], Order.prototype, "orderNumber", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 30, default: enums_1.OrderStatus.PENDING }),
+    (0, typeorm_1.Column)({ type: 'varchar', length: 50, default: enums_1.OrderStatus.PENDING }),
     __metadata("design:type", String)
 ], Order.prototype, "status", void 0);
 __decorate([
@@ -109,6 +111,10 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)({ name: 'updated_at' }),
     __metadata("design:type", Date)
 ], Order.prototype, "updatedAt", void 0);
+__decorate([
+    (0, typeorm_1.DeleteDateColumn)({ name: 'deleted_at', nullable: true }),
+    __metadata("design:type", Object)
+], Order.prototype, "deletedAt", void 0);
 exports.Order = Order = __decorate([
     (0, typeorm_1.Entity)({ name: 'orders' }),
     (0, typeorm_1.Check)('"total_amount" >= 0')

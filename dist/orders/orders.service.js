@@ -50,11 +50,11 @@ let OrdersService = class OrdersService {
             for (const it of dto.items)
                 qtyByBook.set(it.bookId, (qtyByBook.get(it.bookId) ?? 0) + it.quantity);
             const books = await m.find(entities_1.Book, {
-                where: { id: (0, typeorm_2.In)([...qtyByBook.keys()]) },
+                where: { id: (0, typeorm_2.In)([...qtyByBook.keys()]), deletedAt: (0, typeorm_2.IsNull)() },
                 lock: { mode: 'pessimistic_write' },
             });
             if (books.length !== qtyByBook.size)
-                throw new common_1.BadRequestException('Ada buku yang tidak ditemukan');
+                throw new common_1.BadRequestException('Ada buku yang tidak ditemukan atau sudah dihapus');
             const items = [];
             let total = 0;
             for (const book of books) {

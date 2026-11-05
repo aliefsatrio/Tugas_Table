@@ -35,7 +35,10 @@ let ShipmentsService = class ShipmentsService {
     }
     async create(dto) {
         const id = await this.dataSource.transaction(async (m) => {
-            const order = await m.findOne(entities_1.Order, { where: { id: dto.orderId } });
+            const order = await m.findOne(entities_1.Order, {
+                where: { id: dto.orderId },
+                lock: { mode: 'pessimistic_write' },
+            });
             if (!order)
                 throw new common_1.NotFoundException('Order tidak ditemukan');
             if (order.status !== enums_1.OrderStatus.PAID)
@@ -54,7 +57,10 @@ let ShipmentsService = class ShipmentsService {
         return this.findOne(id);
     }
     findAll() {
-        return this.shipments.find({ relations: { order: true } });
+        return this.shipments.find({
+            relations: { order: true },
+            order: { order: { createdAt: 'DESC' } },
+        });
     }
     async findOne(id) {
         const row = await this.shipments.findOne({ where: { id }, relations: { order: true } });
@@ -64,7 +70,10 @@ let ShipmentsService = class ShipmentsService {
     }
     async updateStatus(id, dto) {
         await this.dataSource.transaction(async (m) => {
-            const shipment = await m.findOne(entities_1.Shipment, { where: { id } });
+            const shipment = await m.findOne(entities_1.Shipment, {
+                where: { id },
+                lock: { mode: 'pessimistic_write' },
+            });
             if (!shipment)
                 throw new common_1.NotFoundException('Shipment tidak ditemukan');
             if (!FLOW[shipment.status].includes(dto.status))

@@ -34,9 +34,17 @@ export class BooksService {
     }
   }
 
-  /** Aturan sinkronisasi: stok 0 => tidak tersedia. */
+  /**
+   * Aturan sinkronisasi availabilitas:
+   * - stok 0  => tidak tersedia
+   * - stok > 0 => tersedia (kecuali user eksplisit set isAvailable: false)
+   */
   private syncAvailability(book: Book) {
-    if (book.stock <= 0) book.isAvailable = false;
+    if (book.stock <= 0) {
+      book.isAvailable = false;
+    } else if (book.isAvailable === undefined || book.isAvailable === null) {
+      book.isAvailable = true;
+    }
   }
 
   async create(dto: CreateBookDto) {
@@ -60,6 +68,7 @@ export class BooksService {
       .leftJoinAndSelect('b.publisher', 'publisher')
       .leftJoinAndSelect('b.bookAuthors', 'ba')
       .leftJoinAndSelect('ba.author', 'author')
+      .where('b.deleted_at IS NULL')
       .orderBy('b.createdAt', 'DESC');
     if (q.search) qb.andWhere('b.title ILIKE :s', { s: `%${q.search}%` });
     if (q.categoryId) qb.andWhere('b.category_id = :c', { c: q.categoryId });
@@ -82,7 +91,7 @@ export class BooksService {
       Object.assign(book, data);
       this.syncAvailability(book);
       await m.save(book);
-      if (authorIds) {
+      if (authorIds !== undefined) {
         await m.delete(BookAuthor, { bookId: id });
         if (authorIds.length)
           await m.save(BookAuthor, authorIds.map((authorId) => m.create(BookAuthor, { bookId: id, authorId })));

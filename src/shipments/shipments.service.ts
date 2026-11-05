@@ -23,7 +23,10 @@ export class ShipmentsService {
   /** Pengiriman hanya boleh dibuat untuk order yang sudah dibayar. Order -> processing. */
   async create(dto: CreateShipmentDto) {
     const id = await this.dataSource.transaction(async (m) => {
-      const order = await m.findOne(Order, { where: { id: dto.orderId } });
+      const order = await m.findOne(Order, {
+        where: { id: dto.orderId },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!order) throw new NotFoundException('Order tidak ditemukan');
       if (order.status !== OrderStatus.PAID)
         throw new ConflictException(`Order berstatus "${order.status}"; pengiriman hanya untuk order "paid"`);
@@ -45,7 +48,10 @@ export class ShipmentsService {
   }
 
   findAll() {
-    return this.shipments.find({ relations: { order: true } });
+    return this.shipments.find({
+      relations: { order: true },
+      order: { order: { createdAt: 'DESC' } },
+    });
   }
 
   async findOne(id: string) {
@@ -57,7 +63,10 @@ export class ShipmentsService {
   /** shipped -> shipped_at + order "shipped"; delivered -> delivered_at + order "completed". */
   async updateStatus(id: string, dto: UpdateShipmentStatusDto) {
     await this.dataSource.transaction(async (m) => {
-      const shipment = await m.findOne(Shipment, { where: { id } });
+      const shipment = await m.findOne(Shipment, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!shipment) throw new NotFoundException('Shipment tidak ditemukan');
       if (!FLOW[shipment.status].includes(dto.status))
         throw new ConflictException(`Transisi ${shipment.status} -> ${dto.status} tidak diperbolehkan`);

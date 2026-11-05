@@ -16,21 +16,26 @@ export class PaymentsService {
 
   /** amount otomatis = orders.total_amount (tidak dipercaya dari client). */
   async create(dto: CreatePaymentDto) {
-    const order = await this.dataSource.manager.findOne(Order, { where: { id: dto.orderId } });
-    if (!order) throw new NotFoundException('Order tidak ditemukan');
-    if (order.status !== OrderStatus.PENDING)
-      throw new ConflictException(`Order berstatus "${order.status}", tidak bisa dibayar`);
-    if (await this.payments.exists({ where: { orderId: dto.orderId } }))
-      throw new ConflictException('Order ini sudah memiliki catatan pembayaran');
+    return this.dataSource.transaction(async (m) => {
+      const order = await m.findOne(Order, {
+        where: { id: dto.orderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) throw new NotFoundException('Order tidak ditemukan');
+      if (order.status !== OrderStatus.PENDING)
+        throw new ConflictException(`Order berstatus "${order.status}", tidak bisa dibayar`);
+      if (await m.exists(Payment, { where: { orderId: dto.orderId } }))
+        throw new ConflictException('Order ini sudah memiliki catatan pembayaran');
 
-    return this.payments.save(
-      this.payments.create({
-        orderId: order.id,
-        paymentMethod: dto.paymentMethod,
-        amount: order.totalAmount,
-        status: PaymentStatus.PENDING,
-      }),
-    );
+      return m.save(
+        m.create(Payment, {
+          orderId: order.id,
+          paymentMethod: dto.paymentMethod,
+          amount: order.totalAmount,
+          status: PaymentStatus.PENDING,
+        }),
+      );
+    });
   }
 
   findAll() {
@@ -46,10 +51,14 @@ export class PaymentsService {
   /** paid -> isi paid_at + order jadi "paid". failed -> order tetap pending. */
   async updateStatus(id: string, status: PaymentStatus) {
     await this.dataSource.transaction(async (m) => {
-      const payment = await m.findOne(Payment, { where: { id } });
+      const payment = await m.findOne(Payment, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!payment) throw new NotFoundException('Payment tidak ditemukan');
       if (payment.status === PaymentStatus.PAID && status !== PaymentStatus.PAID)
         throw new ConflictException('Pembayaran yang sudah paid tidak dapat diubah');
+      if (payment.status === status) return; // idempoten, tidak ada yang perlu diubah
 
       payment.status = status;
       payment.paidAt = status === PaymentStatus.PAID ? (payment.paidAt ?? new Date()) : null;

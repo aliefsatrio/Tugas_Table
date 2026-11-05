@@ -2,7 +2,7 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { round2 } from '../common/decimal.transformer';
 import { OrderStatus } from '../common/enums';
 import { Book, CustomerAddress, Order, OrderItem } from '../entities';
@@ -38,6 +38,7 @@ export class OrdersService {
    */
   async create(dto: CreateOrderDto) {
     const orderId = await this.dataSource.transaction(async (m) => {
+      // Pastikan customer valid melalui alamat yang dimilikinya
       const address = await m.findOne(CustomerAddress, {
         where: { id: dto.addressId, customerId: dto.customerId },
       });
@@ -47,11 +48,13 @@ export class OrdersService {
       const qtyByBook = new Map<string, number>();
       for (const it of dto.items) qtyByBook.set(it.bookId, (qtyByBook.get(it.bookId) ?? 0) + it.quantity);
 
+      // Hanya ambil buku yang belum di-soft-delete (deletedAt IS NULL)
       const books = await m.find(Book, {
-        where: { id: In([...qtyByBook.keys()]) },
+        where: { id: In([...qtyByBook.keys()]), deletedAt: IsNull() },
         lock: { mode: 'pessimistic_write' }, // cegah oversell saat checkout bersamaan
       });
-      if (books.length !== qtyByBook.size) throw new BadRequestException('Ada buku yang tidak ditemukan');
+      if (books.length !== qtyByBook.size)
+        throw new BadRequestException('Ada buku yang tidak ditemukan atau sudah dihapus');
 
       const items: OrderItem[] = [];
       let total = 0;

@@ -45,8 +45,12 @@ let BooksService = class BooksService {
         }
     }
     syncAvailability(book) {
-        if (book.stock <= 0)
+        if (book.stock <= 0) {
             book.isAvailable = false;
+        }
+        else if (book.isAvailable === undefined || book.isAvailable === null) {
+            book.isAvailable = true;
+        }
     }
     async create(dto) {
         const id = await this.dataSource.transaction(async (m) => {
@@ -68,6 +72,7 @@ let BooksService = class BooksService {
             .leftJoinAndSelect('b.publisher', 'publisher')
             .leftJoinAndSelect('b.bookAuthors', 'ba')
             .leftJoinAndSelect('ba.author', 'author')
+            .where('b.deleted_at IS NULL')
             .orderBy('b.createdAt', 'DESC');
         if (q.search)
             qb.andWhere('b.title ILIKE :s', { s: `%${q.search}%` });
@@ -93,7 +98,7 @@ let BooksService = class BooksService {
             Object.assign(book, data);
             this.syncAvailability(book);
             await m.save(book);
-            if (authorIds) {
+            if (authorIds !== undefined) {
                 await m.delete(entities_1.BookAuthor, { bookId: id });
                 if (authorIds.length)
                     await m.save(entities_1.BookAuthor, authorIds.map((authorId) => m.create(entities_1.BookAuthor, { bookId: id, authorId })));

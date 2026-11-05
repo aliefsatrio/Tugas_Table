@@ -29,19 +29,24 @@ let PaymentsService = class PaymentsService {
         this.payments = payments;
     }
     async create(dto) {
-        const order = await this.dataSource.manager.findOne(entities_1.Order, { where: { id: dto.orderId } });
-        if (!order)
-            throw new common_1.NotFoundException('Order tidak ditemukan');
-        if (order.status !== enums_1.OrderStatus.PENDING)
-            throw new common_1.ConflictException(`Order berstatus "${order.status}", tidak bisa dibayar`);
-        if (await this.payments.exists({ where: { orderId: dto.orderId } }))
-            throw new common_1.ConflictException('Order ini sudah memiliki catatan pembayaran');
-        return this.payments.save(this.payments.create({
-            orderId: order.id,
-            paymentMethod: dto.paymentMethod,
-            amount: order.totalAmount,
-            status: enums_1.PaymentStatus.PENDING,
-        }));
+        return this.dataSource.transaction(async (m) => {
+            const order = await m.findOne(entities_1.Order, {
+                where: { id: dto.orderId },
+                lock: { mode: 'pessimistic_write' },
+            });
+            if (!order)
+                throw new common_1.NotFoundException('Order tidak ditemukan');
+            if (order.status !== enums_1.OrderStatus.PENDING)
+                throw new common_1.ConflictException(`Order berstatus "${order.status}", tidak bisa dibayar`);
+            if (await m.exists(entities_1.Payment, { where: { orderId: dto.orderId } }))
+                throw new common_1.ConflictException('Order ini sudah memiliki catatan pembayaran');
+            return m.save(m.create(entities_1.Payment, {
+                orderId: order.id,
+                paymentMethod: dto.paymentMethod,
+                amount: order.totalAmount,
+                status: enums_1.PaymentStatus.PENDING,
+            }));
+        });
     }
     findAll() {
         return this.payments.find({ relations: { order: true }, order: { createdAt: 'DESC' } });
@@ -54,11 +59,16 @@ let PaymentsService = class PaymentsService {
     }
     async updateStatus(id, status) {
         await this.dataSource.transaction(async (m) => {
-            const payment = await m.findOne(entities_1.Payment, { where: { id } });
+            const payment = await m.findOne(entities_1.Payment, {
+                where: { id },
+                lock: { mode: 'pessimistic_write' },
+            });
             if (!payment)
                 throw new common_1.NotFoundException('Payment tidak ditemukan');
             if (payment.status === enums_1.PaymentStatus.PAID && status !== enums_1.PaymentStatus.PAID)
                 throw new common_1.ConflictException('Pembayaran yang sudah paid tidak dapat diubah');
+            if (payment.status === status)
+                return;
             payment.status = status;
             payment.paidAt = status === enums_1.PaymentStatus.PAID ? (payment.paidAt ?? new Date()) : null;
             await m.save(payment);
